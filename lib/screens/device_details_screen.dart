@@ -4,6 +4,7 @@ import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import '../bloc/ble_scan/ble_scan_bloc.dart';
 import '../bloc/ble_scan/ble_scan_event.dart';
 import '../bloc/ble_scan/ble_scan_state.dart';
+import 'dart:convert';
 
 class DeviceDetailsScreen extends StatefulWidget {
   final BluetoothDevice device;
@@ -92,9 +93,43 @@ class _DeviceDetailsScreenState extends State<DeviceDetailsScreen> {
                         children: [
                           if (characteristic.properties.read)
                             IconButton(
-                              icon: const Icon(Icons.download),
-                              onPressed: () {
-                                // TODO: Implement read characteristic
+                              icon: const Icon(Icons.info_outline),
+                              onPressed: () async {
+                                try {
+                                  await characteristic.read();
+                                  final bytes = characteristic.lastValue;
+                                  final decoded = utf8.decode(bytes);
+                                  // Show popup dialog instead of snackbar
+                                  showDialog(
+                                    context: context,
+                                    builder: (context) => AlertDialog(
+                                      title: const Text('Characteristic Value'),
+                                      content: Text(decoded),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () =>
+                                              Navigator.of(context).pop(),
+                                          child: const Text('OK'),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                } catch (e) {
+                                  showDialog(
+                                    context: context,
+                                    builder: (context) => AlertDialog(
+                                      title: const Text('Error'),
+                                      content: Text('Failed to read: $e'),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () =>
+                                              Navigator.of(context).pop(),
+                                          child: const Text('OK'),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }
                               },
                             ),
                           if (characteristic.properties.write)
