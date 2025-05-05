@@ -15,15 +15,15 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'BLE Scanner',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
-        useMaterial3: true,
-      ),
-      home: BlocProvider(
-        create: (context) => BleScanBloc(),
-        child: const MyHomePage(title: 'BLE Scanner'),
+    return BlocProvider(
+      create: (context) => BleScanBloc(),
+      child: MaterialApp(
+        title: 'BLE Scanner',
+        theme: ThemeData(
+          colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
+          useMaterial3: true,
+        ),
+        home: const MyHomePage(title: 'BLE Scanner'),
       ),
     );
   }
@@ -57,9 +57,22 @@ class MyHomePage extends StatelessWidget {
 
           if (state is BleScanError) {
             return Center(
-              child: Text(
-                state.message,
-                style: const TextStyle(color: Colors.red),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    state.message,
+                    style: const TextStyle(color: Colors.red),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: () {
+                      context.read<BleScanBloc>().add(StartScan());
+                    },
+                    child: const Text('Try Again'),
+                  ),
+                ],
               ),
             );
           }
@@ -74,8 +87,35 @@ class MyHomePage extends StatelessWidget {
             return ListView.builder(
               itemCount: state.devices.length,
               itemBuilder: (context, index) {
-                return DeviceListItem(device: state.devices[index]);
+                final device = state.devices[index];
+                final isConnected =
+                    state.connectionStates[device.device.remoteId.str] ?? false;
+                return DeviceListItem(
+                  device: device,
+                  isConnected: isConnected,
+                );
               },
+            );
+          }
+
+          if (state is DeviceConnecting) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const CircularProgressIndicator(),
+                  const SizedBox(height: 16),
+                  Text('Connecting to ${state.device.name}...'),
+                ],
+              ),
+            );
+          }
+
+          if (state is DeviceConnected) {
+            // After successful connection, return to the device list
+            context.read<BleScanBloc>().add(StartScan());
+            return const Center(
+              child: CircularProgressIndicator(),
             );
           }
 
