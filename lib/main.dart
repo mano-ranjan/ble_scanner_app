@@ -55,23 +55,22 @@ class MyHomePage extends StatelessWidget {
             );
           }
 
-          if (state is BleScanError) {
+          if (state is DeviceConnected) {
+            // After successful connection, return to the device list
+            context.read<BleScanBloc>().add(StartScan());
+            return const Center(
+              child: CircularProgressIndicator(),
+            );
+          }
+
+          if (state is DeviceConnecting) {
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(
-                    state.message,
-                    style: const TextStyle(color: Colors.red),
-                    textAlign: TextAlign.center,
-                  ),
+                  const CircularProgressIndicator(),
                   const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: () {
-                      context.read<BleScanBloc>().add(StartScan());
-                    },
-                    child: const Text('Try Again'),
-                  ),
+                  Text('Connecting to ${state.device.platformName}...'),
                 ],
               ),
             );
@@ -98,24 +97,25 @@ class MyHomePage extends StatelessWidget {
             );
           }
 
-          if (state is DeviceConnecting) {
+          if (state is BleScanError) {
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const CircularProgressIndicator(),
+                  Text(
+                    state.message,
+                    style: const TextStyle(color: Colors.red),
+                    textAlign: TextAlign.center,
+                  ),
                   const SizedBox(height: 16),
-                  Text('Connecting to ${state.device.name}...'),
+                  ElevatedButton(
+                    onPressed: () {
+                      context.read<BleScanBloc>().add(StartScan());
+                    },
+                    child: const Text('Try Again'),
+                  ),
                 ],
               ),
-            );
-          }
-
-          if (state is DeviceConnected) {
-            // After successful connection, return to the device list
-            context.read<BleScanBloc>().add(StartScan());
-            return const Center(
-              child: CircularProgressIndicator(),
             );
           }
 

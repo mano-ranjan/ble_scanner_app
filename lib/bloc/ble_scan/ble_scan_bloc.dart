@@ -6,6 +6,7 @@ import 'ble_scan_state.dart';
 
 class BleScanBloc extends Bloc<BleScanEvent, BleScanState> {
   StreamSubscription? _scanSubscription;
+  StreamSubscription? _connectionSubscription;
   Map<String, bool> _connectionStates = {};
 
   BleScanBloc() : super(BleScanInitial()) {
@@ -49,6 +50,12 @@ class BleScanBloc extends Bloc<BleScanEvent, BleScanState> {
   }
 
   void _onUpdateDevices(UpdateDevices event, Emitter<BleScanState> emit) {
+    if (state is DeviceDetailsLoaded) {
+      final currentState = state as DeviceDetailsLoaded;
+      emit(DeviceDetailsLoaded(currentState.device, currentState.services));
+      return;
+    }
+
     emit(BleScanSuccess(event.devices as List<ScanResult>,
         connectionStates: _connectionStates));
   }
@@ -56,22 +63,35 @@ class BleScanBloc extends Bloc<BleScanEvent, BleScanState> {
   Future<void> _onConnectToDevice(
       ConnectToDevice event, Emitter<BleScanState> emit) async {
     try {
+      // Cancel any existing connection subscription
+      await _connectionSubscription?.cancel();
+
+      // Emit connecting state
       emit(DeviceConnecting(event.device));
 
-      await event.device.connect();
-      _connectionStates[event.device.remoteId.str] = true;
-      emit(DeviceConnected(event.device));
+      // Listen to connection state changes
+      _connectionSubscription =
+          event.device.connectionState.listen((state) async {
+        if (state == BluetoothConnectionState.connected) {
+          _connectionStates[event.device.remoteId.str] = true;
+          add(LoadDeviceDetails(event.device));
+        } else if (state == BluetoothConnectionState.disconnected) {
+          _connectionStates[event.device.remoteId.str] = false;
+          if (this.state is BleScanSuccess) {
+            final currentState = this.state as BleScanSuccess;
+            emit(BleScanSuccess(currentState.devices,
+                connectionStates: _connectionStates));
+          }
+        }
+      });
 
-      // Load device details after successful connection
-      add(LoadDeviceDetails(event.device));
-
-      // Update the device list with new connection state
-      if (state is BleScanSuccess) {
-        final currentState = state as BleScanSuccess;
-        emit(BleScanSuccess(currentState.devices,
-            connectionStates: _connectionStates));
-      }
+      // Attempt connection
+      await event.device.connect(
+        timeout: const Duration(seconds: 4),
+        autoConnect: false,
+      );
     } catch (e) {
+      _connectionStates[event.device.remoteId.str] = false;
       emit(BleScanError('Failed to connect: ${e.toString()}'));
     }
   }
@@ -81,9 +101,7 @@ class BleScanBloc extends Bloc<BleScanEvent, BleScanState> {
     try {
       await event.device.disconnect();
       _connectionStates[event.device.remoteId.str] = false;
-      emit(DeviceDisconnected(event.device));
 
-      // Update the device list with new connection state
       if (state is BleScanSuccess) {
         final currentState = state as BleScanSuccess;
         emit(BleScanSuccess(currentState.devices,
@@ -102,6 +120,13 @@ class BleScanBloc extends Bloc<BleScanEvent, BleScanState> {
       // Discover services
       List<BluetoothService> services = await event.device.discoverServices();
       emit(DeviceDetailsLoaded(event.device, services));
+
+      // Update device list with connection state
+      if (state is BleScanSuccess) {
+        final currentState = state as BleScanSuccess;
+        emit(BleScanSuccess(currentState.devices,
+            connectionStates: _connectionStates));
+      }
     } catch (e) {
       emit(BleScanError('Failed to load device details: ${e.toString()}'));
     }
@@ -110,6 +135,7 @@ class BleScanBloc extends Bloc<BleScanEvent, BleScanState> {
   @override
   Future<void> close() {
     _scanSubscription?.cancel();
+    _connectionSubscription?.cancel();
     return super.close();
   }
 }

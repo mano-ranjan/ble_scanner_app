@@ -5,23 +5,49 @@ import '../bloc/ble_scan/ble_scan_bloc.dart';
 import '../bloc/ble_scan/ble_scan_event.dart';
 import '../bloc/ble_scan/ble_scan_state.dart';
 
-class DeviceDetailsScreen extends StatelessWidget {
+class DeviceDetailsScreen extends StatefulWidget {
   final BluetoothDevice device;
 
   const DeviceDetailsScreen({super.key, required this.device});
 
   @override
+  State<DeviceDetailsScreen> createState() => _DeviceDetailsScreenState();
+}
+
+class _DeviceDetailsScreenState extends State<DeviceDetailsScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Load device details when screen opens
+    context.read<BleScanBloc>().add(LoadDeviceDetails(widget.device));
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(device.platformName.isNotEmpty
-            ? device.platformName
+        title: Text(widget.device.platformName.isNotEmpty
+            ? widget.device.platformName
             : 'Device Details'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () {
-              context.read<BleScanBloc>().add(LoadDeviceDetails(device));
+          BlocBuilder<BleScanBloc, BleScanState>(
+            builder: (context, state) {
+              return IconButton(
+                icon: state is DeviceDetailsLoading
+                    ? const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.refresh),
+                onPressed: state is DeviceDetailsLoading
+                    ? null
+                    : () {
+                        context
+                            .read<BleScanBloc>()
+                            .add(LoadDeviceDetails(widget.device));
+                      },
+              );
             },
           ),
         ],
